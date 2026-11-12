@@ -597,9 +597,8 @@ public class ConfigWindow : Window
 
         var isMock = playbackState.CurrentTrack == null;
         var track = isMock ? (object)CreateMockSpotifyTrack() : playbackState.CurrentTrack!;
-        var now = DateTimeOffset.UtcNow;
-        var mockContext = new UpdaterContext { SecsElapsed = 0, TrackStartedAt = now };
-        var activity = TemplateHelper.CreateActivity(track, mockContext.TrackStartedAt, now);
+        var mockContext = new UpdaterContext { SecsElapsed = 0 };
+        var activity = TemplateHelper.CreateActivity(track, 0);
 
         try
         {
