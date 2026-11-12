@@ -709,7 +709,7 @@ public class ConfigWindow : Window
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Artists[0].Name"); ImGui.TableNextColumn(); ImGui.Text("System.String");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Album.Name"); ImGui.TableNextColumn(); ImGui.Text("System.String");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.DurationMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
-            ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Elapsed"); ImGui.TableNextColumn(); ImGui.Text("System.TimeSpan");
+            ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.ElapsedMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.Popularity"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
 
             foreach (var property in UpdaterContextProperties)

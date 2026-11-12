@@ -48,7 +48,7 @@ public class UpdaterTests
     public void UpdaterContext_TrackStartedAt_IsNotATemplateVariable()
     {
         // The config window lists public UpdaterContext properties as template
-        // variables; the start time is exposed only as Activity.Elapsed.
+        // variables; the start time is exposed only as Activity.ElapsedMs.
         typeof(UpdaterContext).GetProperties().Select(p => p.Name)
             .Should().NotContain(nameof(UpdaterContext.TrackStartedAt));
     }

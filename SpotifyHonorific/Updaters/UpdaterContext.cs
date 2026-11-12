@@ -8,6 +8,6 @@ public class UpdaterContext
 
     // When the current track started playing, per Spotify's reported progress.
     // Internal so it stays out of the template variables; templates see it as
-    // Activity.Elapsed.
+    // Activity.ElapsedMs.
     internal DateTimeOffset? TrackStartedAt { get; set; }
 }
