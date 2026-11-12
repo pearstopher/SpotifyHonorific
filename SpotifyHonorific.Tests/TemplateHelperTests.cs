@@ -101,6 +101,64 @@ public class TemplateHelperCreateActivityTests
         activity["Elapsed"].Should().BeNull();
     }
 
+    // Same shape as Discord.Net's SpotifyGame, which DiscordActivityHonorific
+    // passed to templates as Activity:
+    //   public DateTimeOffset? StartedAt { get; }
+    //   public TimeSpan? Elapsed => DateTimeOffset.UtcNow - StartedAt;
+    // with the clock fixed so both sides see the same instant.
+    private sealed class OriginalSpotifyActivity(DateTimeOffset? startedAt, DateTimeOffset now)
+    {
+        public DateTimeOffset? StartedAt { get; } = startedAt;
+        public TimeSpan? Elapsed => now - StartedAt;
+    }
+
+    private static string RenderWith(object activity, string template)
+        => Scriban.Template.Parse(template).Render(new { Activity = activity }, member => member.Name);
+
+    [Theory]
+    [InlineData("{{ Activity.Elapsed }}")]
+    [InlineData("{{ Activity.Elapsed.TotalSeconds }}")]
+    [InlineData("{{ Activity.Elapsed.TotalSeconds | math.floor }}")]
+    [InlineData("{{ Activity.Elapsed.TotalMinutes }}")]
+    [InlineData("{{ Activity.Elapsed.TotalMilliseconds }}")]
+    [InlineData("{{ Activity.Elapsed.Hours }}:{{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds }}.{{ Activity.Elapsed.Milliseconds }}")]
+    [InlineData("{{ (Activity.Elapsed.TotalSeconds / 60) | math.floor }}:{{ (Activity.Elapsed.TotalSeconds % 60) | math.floor }}")]
+    [InlineData("{{ Activity.Elapsed.Hours > 0 ? \"h\" : \"m\" }}")]
+    [InlineData("{{ Activity.Elapsed.TotalSeconds > 60 }}")]
+    [InlineData("{{ Activity.Elapsed == null }}")]
+    public void CreateActivity_Elapsed_RendersLikeTheOriginalActivity(string template)
+    {
+        var startedAt = Now - TimeSpan.FromMilliseconds(3_723_456); // 1:02:03.456 in
+
+        var original = RenderWith(new OriginalSpotifyActivity(startedAt, Now), template);
+        var current = RenderWith(TemplateHelper.CreateActivity(MakeTrack(), startedAt, Now), template);
+
+        current.Should().Be(original);
+    }
+
+    [Theory]
+    [InlineData("[{{ Activity.Elapsed }}]")]
+    [InlineData("{{ Activity.Elapsed == null }}")]
+    public void CreateActivity_NoStartTime_RendersLikeTheOriginalActivity(string template)
+    {
+        var original = RenderWith(new OriginalSpotifyActivity(null, Now), template);
+        var current = RenderWith(TemplateHelper.CreateActivity(MakeTrack(), null, Now), template);
+
+        current.Should().Be(original);
+    }
+
+    [Fact]
+    public void CreateActivity_NoStartTime_MemberAccessFailsLikeTheOriginalActivity()
+    {
+        const string template = "{{ Activity.Elapsed.TotalSeconds }}";
+
+        var original = () => RenderWith(new OriginalSpotifyActivity(null, Now), template);
+        var current = () => RenderWith(TemplateHelper.CreateActivity(MakeTrack(), null, Now), template);
+
+        var originalError = original.Should().Throw<Scriban.Syntax.ScriptRuntimeException>().Which.OriginalMessage;
+        current.Should().Throw<Scriban.Syntax.ScriptRuntimeException>().Which.OriginalMessage.Should().Be(originalError);
+    }
+
     [Fact]
     public void CreateActivity_KeepsTrackMembers()
     {
