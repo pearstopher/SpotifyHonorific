@@ -88,3 +88,7 @@ Steps (compare the title's `m:ss` with Spotify's position; `T` is `Context.SecsE
 4. **Skip** to the next song. `m:ss` starts again from ~0:00.
 5. Optional, remaining time: `{{ (Activity.DurationMs - Activity.ElapsedMs) // 1000 }}` counts down to 0 by the end of the song.
 
+Note: with rate limit protection on, the plugin checks Spotify every 15 s while nothing is playing, so a title can take up to ~15 s to appear after pressing play or resuming. Wait ~20 s before judging a step.
+
+Result 2026-11-12: pass. Minutes and seconds built from `Activity.ElapsedMs` follow Spotify's position. Log: no errors after the template was complete (11:22 errors were mid-typing saves); titles sent and cleared normally.
+
