@@ -1,10 +1,9 @@
 # Code changes: `Activity.ProgressMs`
 
-Fork-only. Every line added or modified to re-add the song's playback position as `Activity.ProgressMs`, shown and explained, with how each line follows the original [DiscordActivityHonorific](https://github.com/anya-hichu/DiscordActivityHonorific) (anya's plugin, "the original" below). This is the net change against upstream: `git diff upstream/master -- SpotifyHonorific SpotifyHonorific.Tests README.md`.
+Fork-only. Every line added or modified to re-add the song's playback position as `Activity.ProgressMs`, shown and explained, with how each line follows the original [DiscordActivityHonorific](https://github.com/anya-hichu/DiscordActivityHonorific) (anya's plugin, "the original" below). This is the net change against upstream: `git diff upstream/master -- SpotifyHonorific README.md`.
 
 - **Plugin code:** 5 files, 11 lines added, 4 lines replaced. No new `using` lines, no new methods.
 - **README:** 1 line added.
-- **Tests:** 21 lines added (5 test cases); no existing test changed. 262 tests pass.
 
 Issues: #6 (re-add the variable), #16 (milliseconds), #22 (align with the original), #25 (`ProgressMs`, minimal change).
 
@@ -23,7 +22,7 @@ public DateTimeOffset? StartedAt { get; internal set; }
 public TimeSpan? Elapsed => DateTimeOffset.UtcNow - StartedAt;
 ```
 
-Discord sends a new presence, with a new `StartedAt`, when a song starts, resumes or is seeked. The original re-rendered the title every 100 ms. It had no live preview, no README variable list and no tests; its config window listed variables by reflecting over the activity type.
+Discord sends a new presence, with a new `StartedAt`, when a song starts, resumes or is seeked. The original re-rendered the title every 100 ms. It had no live preview and no README variable list; its config window listed variables by reflecting over the activity type.
 
 ## How this follows it
 
@@ -41,7 +40,7 @@ The same pattern: **store when the song started; compute the position at render 
 | Start time and `Elapsed` live on the activity object | Start time on `UpdaterContext` (internal); `Activity` is a small wrapper | `Activity` here is the Spotify library's `FullTrack`, which can't be given new members. |
 | Re-rendered every 100 ms regardless | `ProgressMs` added to upstream's time-dependence check | Upstream only keeps re-rendering titles it considers time-dependent; without this, a `ProgressMs` title would freeze. |
 | Variable table by reflection | One hard-coded row | Upstream hard-codes its `Activity.*` rows. |
-| No live preview, README list or tests | Preview shows 0, one README row, tests | Following upstream's conventions. |
+| No live preview or README list | Preview shows 0, one README row | Following upstream's conventions. |
 
 ---
 
@@ -152,65 +151,3 @@ Nothing is reset when the title clears: nothing renders after a clear, and the n
 | Line | Explanation | Original |
 |---|---|---|
 | `\| Activity.ProgressMs \| Int \| …` | One row after `Activity.DurationMs`, same format. | The original's README listed no variables. |
-
----
-
-## Tests
-
-All added; 262 pass (upstream's 257 + 5).
-
-### `SpotifyHonorific.Tests/TemplateHelperTests.cs`
-
-```csharp
-[Theory]
-[InlineData("{{ Activity.ProgressMs // 1000 }}", true)]
-[InlineData("Progress: {{ Activity.Name }}", false)]
-public void IsTimeDependent_OnlyExactProgressMs_ReturnsTrue(string template, bool expected)
-{
-    TemplateHelper.IsTimeDependent(new ActivityConfig { TitleTemplate = template }).Should().Be(expected);
-}
-```
-
-A template using `ProgressMs` keeps re-rendering; the plain word "Progress" doesn't count.
-
-### `SpotifyHonorific.Tests/TitleRenderingServiceTests.cs`
-
-Added to the existing `TitleRenderingServiceOverflowTests` class, reusing its service and `MakeTrack` helper:
-
-```csharp
-// 0.2 s of slack so a slow test run can't tip into the next second.
-private static UpdaterContext ContextAt(double seconds) => new() { TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(seconds + 0.2) };
-
-[Theory]
-[InlineData("{{ Activity.ProgressMs // 1000 }}", "83")]
-[InlineData("{{ Activity.ProgressMs // 60000 }}:{{ Activity.ProgressMs // 1000 % 60 | math.format \"00\" }}", "1:23")]
-[InlineData("{{ Activity.Artists[0].Name }} - {{ Activity.Name }}", "Artist - Song")]
-public void RenderTitle_ProgressMs_IsTimeSinceTrackStartedAndKeepsTrackVariables(string template, string expected)
-```
-
-Renders through the real `RenderTitle` with a song started 83 s ago:
-
-| Case | What it checks |
-|---|---|
-| `ProgressMs // 1000` → `83` | `ProgressMs` is the time since the song started. |
-| `m:ss` → `1:23` | Minutes and seconds built from milliseconds (`//` is Scriban's whole-number division). |
-| `Artists[0].Name - Name` → `Artist - Song` | The track's existing variables still work through the wrapper. |
-
-### `SpotifyHonorific.Tests/UpdaterTests.cs`
-
-No net change: the earlier start-time helper and its tests were removed along with the helper.
-
----
-
-## Not changed
-
-- `Context.SecsElapsed`: how it counts, when it resets, and its README row.
-- Polling: no extra Spotify requests.
-- Everything else in the plugin.
-
-## Trade-offs of the minimal version
-
-- **No dedicated helper or its unit tests:** the start-time calculation is a single inline line in `Updater.ProcessPollResult` (a private method). It's covered indirectly by the render tests and the manual test.
-- **Full names instead of `using` lines:** `Scriban.Runtime.ScriptObject`, `Scriban.Runtime.ScriptObjectExtensions.Import` and `System.DateTimeOffset` are written out, which makes three lines longer but adds no lines.
-- **Wrapper built in two places:** the real render and the preview each build `Activity` in two lines, instead of sharing a helper method (which would add more lines than it saves).
-- **No README example:** the original had no README docs; the variable row is enough.
