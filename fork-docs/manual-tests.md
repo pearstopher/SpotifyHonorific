@@ -81,6 +81,8 @@ Same checks as #16 below, with the renamed variable. Claude has rebuilt the dev 
    Live Preview shows `0:00 T0`.
 3. Play, pause/resume, seek, skip: `m:ss` follows Spotify's position (allow ~15 s after play/resume with rate limit protection on).
 
+Result 2026-11-12: pass. Timers built from `Activity.ProgressMs` are correct in game.
+
 ## `Activity.ElapsedMs` (#16) — superseded by #25
 
 Checks that `Activity.ElapsedMs` (milliseconds, like `Activity.DurationMs`) follows Spotify's position. Have the Spotify app open. Claude has rebuilt the dev plugin.
