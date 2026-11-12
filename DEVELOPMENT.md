@@ -9,6 +9,30 @@ Fork-only notes for pearstopher/SpotifyHonorific. Not part of upstream PRs.
 
 Sync the fork with upstream: `gh repo sync pearstopher/SpotifyHonorific`, then `git pull` on `master`.
 
+## One-time setup
+
+- .NET 10 SDK (`dotnet --list-sdks` shows `10.0.x`).
+- XIVLauncher with Dalamud installed and run at least once. The Dalamud SDK finds it at `%APPDATA%\XIVLauncher\addon\Hooks\dev\` automatically; set `DALAMUD_HOME` only if Dalamud lives somewhere else.
+- In game, `/xlsettings` → Experimental → **Dev Plugin Locations**: add
+  `C:\Users\snows\Documents\VSCode\ffxiv-spotify-honorific-fork\SpotifyHonorific\bin\Debug\SpotifyHonorific.dll`, then Save.
+
+## Build and test
+
+- `dotnet build`: builds the plugin and the tests (Debug). Output: `SpotifyHonorific\bin\Debug\` (`SpotifyHonorific.dll` + `SpotifyHonorific.json`).
+- `dotnet test`: runs the xUnit tests in `SpotifyHonorific.Tests`.
+
+## Edit-and-test loop
+
+1. Edit code, then run `dotnet build` and `dotnet test`.
+2. In game: `/xlplugins` → Dev Tools → Installed Dev Plugins → SpotifyHonorific. Turn on **auto-reload** once; after that, every build reloads the plugin automatically. (Otherwise disable and re-enable it.)
+3. Only one SpotifyHonorific can be loaded at a time. **Disable** the installed one (from my repo URL) before enabling the dev build, and switch back after.
+4. Check the version in the plugin list: the dev build shows the csproj `<Version>` (currently `1.18.1.0`; upstream only sets the real version at release time), while repo builds show `1.18.2.x`.
+
+## Logs
+
+- `%APPDATA%\XIVLauncher\dalamud.log` (previous session: `dalamud.old.log`). In game, `/xllog` shows the same log live.
+- Plugin lines are tagged `[SpotifyHonorific]`; debug lines (e.g. `POLLING NOW`) need the log level set to Debug in `/xllog`.
+
 ## Test builds from this fork
 
 `.github/workflows/fork-release.yml` builds the plugin and publishes a GitHub release with `SpotifyHonorific.zip` and a generated `repo.json`.
@@ -33,3 +57,6 @@ Fork Actions settings: upstream's "Build and Release" (`release.yml`) and "Daily
 |---|---|
 | Plugin doesn't appear in the installer | Check the repo URL is enabled; open the URL in a browser to confirm `repo.json` downloads. |
 | Fork release workflow fails at "Determine Version" | Tag must have 4 parts, e.g. `v1.18.2.1`. |
+| Build error about Dalamud references | Dalamud isn't at `%APPDATA%\XIVLauncher\addon\Hooks\dev\`: run the game once with Dalamud, or set `DALAMUD_HOME`. |
+| Dev plugin won't load / "already loaded" | Disable the installed SpotifyHonorific first; both share the same internal name. |
+| Change didn't take effect | Check the version in `/xlplugins` and that auto-reload is on; rebuild. |
