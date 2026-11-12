@@ -27,29 +27,29 @@
 
 ### How to keep it current between polls
 
-- On each poll with `PollOutcome.Playing`: set the position from `ProgressMs`. Do this in `ProcessPollResult`, **before** `ProcessCurrentlyPlayingTrack`, because that method returns early for the same track; seeks within a song must still resync.
-- Every frame in `ProcessTitleUpdate`: advance it by `deltaSeconds`, right next to `SecsElapsed`. This counts forward between polls and through held (failed) polls.
-- In `ClearTitle`: reset to 0 alongside `SecsElapsed`.
+Mirror Discord.Net: store when the song started, and compute `Elapsed` at render time.
+
+- On each poll with `PollOutcome.Playing`: set the start time to `UtcNow - ProgressMs`. Do this in `ProcessPollResult`, **before** `ProcessCurrentlyPlayingTrack`, because that method returns early for the same track; seeks within a song must still resync.
+- At render: `Elapsed = UtcNow - startedAt`. No per-frame counting; it advances on its own between polls and through held (failed) polls.
+- In `ClearTitle`: reset the start time to null alongside `SecsElapsed`.
 - Accuracy: within roughly one API round-trip of Spotify's position, resynced every poll. After resuming, the title reappears on the next poll (as today) already at the right position.
 
-### Recommendation
+### Decision
 
-- **Name and type:** `Context.ProgressMs`, a `Double` in milliseconds.
-  - Matches Spotify's own field (`progress_ms`, already `ProgressMs` in the code) and pairs with the existing `Activity.DurationMs` for "position / duration" templates and remaining time (`Activity.DurationMs - Context.ProgressMs`).
-  - Double so per-frame advancing doesn't lose fractions of a millisecond.
-  - Alternative in `SecsElapsed`'s style: `Context.SecsProgress` (Double, seconds). Easy to switch before #6.
-- **Where the code goes** (a few lines):
-  1. `UpdaterContext`: `public double ProgressMs { get; set; }`.
+**Spec: the name must match the original exactly → `Activity.Elapsed`, type `TimeSpan?`** (as in Discord.Net's `SpotifyGame`). Templates use it the same way as before, e.g. `Activity.Elapsed.Minutes`, `Activity.Elapsed.Seconds`, `Activity.Elapsed.TotalSeconds`.
+
+- **Challenge:** `Activity` is now SpotifyAPI.Web's `FullTrack`, which can't be given new properties.
+- **Approach:** at render, wrap the track in a Scriban `ScriptObject`: import the `FullTrack`'s members (so every existing `Activity.*` keeps working) and add `Elapsed`. One small shared helper, used by `TitleRenderingService` and the config window preview. If import doesn't preserve existing `Activity.*` access, fall back to a thin wrapper type.
+- **Where the code goes** (~15 lines):
+  1. `UpdaterContext`: an **internal** start-time property (`DateTimeOffset?`). Internal so it's hidden from templates and from the config window's reflection-based variable table.
   2. `Updater.ProcessPollResult`: set it from `result.ProgressMs` when playing.
-  3. `Updater.ProcessTitleUpdate`: `+= deltaSeconds * 1000`.
-  4. `Updater.ClearTitle`: reset to 0.
-  5. README "Template Variables" table: one row after `Context.SecsElapsed`.
-- **No other changes needed:**
-  - `TemplateHelper.IsTimeDependent` already treats any template mentioning `Context` as time-dependent, so it keeps re-rendering.
-  - The config window's "Available Template Variables" table lists `UpdaterContext` properties by reflection.
-  - The preview's mock context defaults the new property to 0.
-- **Tests:** follow the existing pattern of small `internal static` helpers tested directly (like `ComputeNextPollInterval`, `CheckRenderDue`), e.g. a helper for "position after a poll / after a frame". Add a `TitleRenderingService` test that a template using `Context.ProgressMs` renders the expected `m:ss`.
+  3. `Updater.ClearTitle`: reset to null.
+  4. Shared helper building the `Activity` object with `Elapsed`; used in `TitleRenderingService.RenderTitle` and the `ConfigWindow` preview (preview shows `00:00:00`).
+  5. `TemplateHelper.IsTimeDependent`: also true for templates using `Activity.Elapsed`, so they keep re-rendering without `Context`.
+  6. `ConfigWindow` "Available Template Variables": one hard-coded `Activity.Elapsed` row (the `Activity` rows are hard-coded).
+  7. README "Template Variables" table: one `Activity.Elapsed` row after `Activity.DurationMs`.
+- **Tests:** follow the existing pattern of small `internal static` helpers tested directly (like `ComputeNextPollInterval`, `CheckRenderDue`): start time from a poll, elapsed at a given time. `TitleRenderingService` tests: existing `Activity.*` fields still render through the wrapper, and `Activity.Elapsed` renders `m:ss`. `TemplateHelper` test for `IsTimeDependent`.
 - **Example template** (to confirm in #6's tests):
   ```
-  {{ (Context.ProgressMs / 60000) | math.floor }}:{{ ((Context.ProgressMs / 1000) % 60) | math.floor | math.format "00" }}
+  {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format "00" }}
   ```
