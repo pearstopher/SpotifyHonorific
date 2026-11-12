@@ -496,6 +496,8 @@ public class Updater : IDisposable
 
         if (outcome == PollOutcome.Playing && track != null)
         {
+            // Resync on every poll, not just new tracks, so seeks are picked up.
+            _updaterContext.TrackStartedAt = ComputeTrackStartedAt(result?.ProgressMs, DateTimeOffset.UtcNow);
             _isMusicPlaying = true;
             _tracksPlayedThisSession.Add(track.Id);
             ProcessCurrentlyPlayingTrack(track);
@@ -552,6 +554,9 @@ public class Updater : IDisposable
         if (durationMs - progressMs <= TRACK_END_WINDOW_MS) return PROTECTED_EDGE_POLL_SECONDS;
         return PROTECTED_MID_POLL_SECONDS;
     }
+
+    internal static DateTimeOffset? ComputeTrackStartedAt(int? progressMs, DateTimeOffset now)
+        => progressMs is { } ms ? now - TimeSpan.FromMilliseconds(ms) : null;
 
     internal static bool ShouldSkipTrackProcessing(string? currentTrackId, string newTrackId, Action? updateTitle)
         => currentTrackId == newTrackId && updateTitle != null;
@@ -674,6 +679,7 @@ public class Updater : IDisposable
             _clearCharacterTitleSubscriber.InvokeAction(0);
         });
         _updaterContext.SecsElapsed = 0;
+        _updaterContext.TrackStartedAt = null;
         _titleState.Clear();
         _currentTrackId = null;
     }

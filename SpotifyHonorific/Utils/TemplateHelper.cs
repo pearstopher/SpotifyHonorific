@@ -1,5 +1,7 @@
 using Scriban;
+using Scriban.Runtime;
 using SpotifyHonorific.Activities;
+using System;
 using System.Linq;
 
 namespace SpotifyHonorific.Utils;
@@ -14,10 +16,26 @@ public static class TemplateHelper
 
     /// <summary>
     /// True if the rendered title can change over time: rainbow mode animates the
-    /// color, and "Context" is the only time-varying render variable (exact member
-    /// name; Scriban's renamer exposes property names verbatim). False positives
-    /// only cause unnecessary re-renders, which is the safe direction.
+    /// color, and "Context" and "Activity.Elapsed" are the time-varying render
+    /// variables (exact member names; Scriban's renamer exposes property names
+    /// verbatim). False positives only cause unnecessary re-renders, which is the
+    /// safe direction.
     /// </summary>
     public static bool IsTimeDependent(ActivityConfig config)
-        => config.RainbowMode || config.TitleTemplate.Contains("Context");
+        => config.RainbowMode
+           || config.TitleTemplate.Contains("Context")
+           || config.TitleTemplate.Contains("Elapsed");
+
+    /// <summary>
+    /// Builds the template's Activity: the track's own members plus Elapsed, how
+    /// far into the track playback is (same name and type as the Spotify activity
+    /// in DiscordActivityHonorific).
+    /// </summary>
+    public static ScriptObject CreateActivity(object track, DateTimeOffset? trackStartedAt, DateTimeOffset now)
+    {
+        var activity = new ScriptObject();
+        activity.Import(track, ScriptMemberImportFlags.Field | ScriptMemberImportFlags.Property, renamer: member => member.Name);
+        activity["Elapsed"] = now - trackStartedAt;
+        return activity;
+    }
 }

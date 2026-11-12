@@ -4,6 +4,8 @@ using SpotifyAPI.Web;
 using SpotifyHonorific.Activities;
 using SpotifyHonorific.Gradient;
 using SpotifyHonorific.Updaters;
+using SpotifyHonorific.Utils;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -37,7 +39,8 @@ public class TitleRenderingService
             return null;
         }
 
-        var title = template.Render(new { Activity = track, Context = context }, member => member.Name);
+        var activity = TemplateHelper.CreateActivity(track, context.TrackStartedAt, DateTimeOffset.UtcNow);
+        var title = template.Render(new { Activity = activity, Context = context }, member => member.Name);
 
         if (title.Length > MAX_TITLE_LENGTH)
         {
