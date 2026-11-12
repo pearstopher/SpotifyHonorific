@@ -16,7 +16,7 @@ public static class TemplateHelper
 
     /// <summary>
     /// True if the rendered title can change over time: rainbow mode animates the
-    /// color, and "Context" and "Activity.Elapsed" are the time-varying render
+    /// color, and "Context" and "Activity.ElapsedMs" are the time-varying render
     /// variables (exact member names; Scriban's renamer exposes property names
     /// verbatim). False positives only cause unnecessary re-renders, which is the
     /// safe direction.
@@ -27,15 +27,14 @@ public static class TemplateHelper
            || config.TitleTemplate.Contains("Elapsed");
 
     /// <summary>
-    /// Builds the template's Activity: the track's own members plus Elapsed, how
-    /// far into the track playback is (same name and type as the Spotify activity
-    /// in DiscordActivityHonorific).
+    /// Builds the template's Activity: the track's own members plus ElapsedMs, how
+    /// far into the track playback is in milliseconds (matching DurationMs).
     /// </summary>
     public static ScriptObject CreateActivity(object track, DateTimeOffset? trackStartedAt, DateTimeOffset now)
     {
         var activity = new ScriptObject();
         activity.Import(track, ScriptMemberImportFlags.Field | ScriptMemberImportFlags.Property, renamer: member => member.Name);
-        activity["Elapsed"] = now - trackStartedAt;
+        activity["ElapsedMs"] = (int?)(now - trackStartedAt)?.TotalMilliseconds;
         return activity;
     }
 }

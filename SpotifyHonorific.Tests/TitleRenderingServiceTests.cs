@@ -157,11 +157,11 @@ public class TitleRenderingServiceOverflowTests
     }
 }
 
-public class TitleRenderingServiceActivityElapsedTests
+public class TitleRenderingServiceActivityElapsedMsTests
 {
     private readonly TitleRenderingService _service;
 
-    public TitleRenderingServiceActivityElapsedTests()
+    public TitleRenderingServiceActivityElapsedMsTests()
     {
         var cache = new TemplateCache(Substitute.For<IPluginLog>());
         _service = new TitleRenderingService(cache, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
@@ -187,24 +187,24 @@ public class TitleRenderingServiceActivityElapsedTests
         => _service.RenderTitle(new ActivityConfig { TitleTemplate = template }, MakeTrack(), context);
 
     [Fact]
-    public void RenderTitle_ActivityElapsed_RendersMinutesAndSeconds()
+    public void RenderTitle_ActivityElapsedMs_RendersMilliseconds()
     {
-        Render("{{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format \"00\" }}", ContextAt(83))
-            .Should().Be("1:23");
-    }
-
-    [Fact]
-    public void RenderTitle_ActivityElapsedTotalSeconds_Renders()
-    {
-        Render("{{ Activity.Elapsed.TotalSeconds | math.floor }}", ContextAt(83))
+        Render("{{ Activity.ElapsedMs // 1000 }}", ContextAt(83))
             .Should().Be("83");
     }
 
     [Fact]
     public void RenderTitle_ReadmeSongPositionExample_Renders()
     {
-        Render("{{ Activity.Name | string.truncate 26 }} {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format \"00\" }}", ContextAt(65))
+        Render("{{ Activity.Name | string.truncate 26 }} {{ Activity.ElapsedMs // 60000 }}:{{ Activity.ElapsedMs // 1000 % 60 | math.format \"00\" }}", ContextAt(65))
             .Should().Be("Never Gonna Give You Up 1:05");
+    }
+
+    [Fact]
+    public void RenderTitle_RemainingTimeFromDurationMs_Renders()
+    {
+        Render("{{ (Activity.DurationMs - Activity.ElapsedMs) // 1000 }}", ContextAt(13))
+            .Should().Be("199");
     }
 
     [Theory]
