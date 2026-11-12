@@ -155,6 +155,24 @@ public class TitleRenderingServiceOverflowTests
         _chatGui.Received(1).Print(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
         _chatGui.DidNotReceive().PrintError(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
     }
+}
+
+public class TitleRenderingServiceProgressMsTests
+{
+    private readonly TitleRenderingService _service;
+
+    public TitleRenderingServiceProgressMsTests()
+    {
+        var cache = new TemplateCache(Substitute.For<IPluginLog>());
+        _service = new TitleRenderingService(cache, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+    }
+
+    private static FullTrack MakeTrack() => new()
+    {
+        Id = "track1",
+        Name = "Song",
+        Artists = [new SimpleArtist { Name = "Artist" }],
+    };
 
     // 0.2 s of slack so a slow test run can't tip into the next second.
     private static UpdaterContext ContextAt(double seconds) => new() { TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(seconds + 0.2) };
@@ -165,7 +183,7 @@ public class TitleRenderingServiceOverflowTests
     [InlineData("{{ Activity.Artists[0].Name }} - {{ Activity.Name }}", "Artist - Song")]
     public void RenderTitle_ProgressMs_IsTimeSinceTrackStartedAndKeepsTrackVariables(string template, string expected)
     {
-        _service.RenderTitle(new ActivityConfig { TitleTemplate = template }, MakeTrack("Artist", "Song"), ContextAt(83))
+        _service.RenderTitle(new ActivityConfig { TitleTemplate = template }, MakeTrack(), ContextAt(83))
             .Should().Be(expected);
     }
 }
