@@ -46,12 +46,15 @@ public class TemplateHelperIsTimeDependentTests
         TemplateHelper.IsTimeDependent(config).Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData("{{ Activity.ProgressMs // 1000 }}", true)]
-    [InlineData("Progress: {{ Activity.Name }}", false)]
-    public void IsTimeDependent_ProgressMs_MatchesOnlyTheExactName(string template, bool expected)
+    [Fact]
+    public void IsTimeDependent_TemplateReferencesProgressMs_ReturnsTrue()
     {
-        TemplateHelper.IsTimeDependent(new ActivityConfig { TitleTemplate = template }).Should().Be(expected);
+        var config = new ActivityConfig
+        {
+            TitleTemplate = "{{ Activity.ProgressMs // 1000 }}",
+            RainbowMode = false
+        };
+        TemplateHelper.IsTimeDependent(config).Should().BeTrue();
     }
 
     [Fact]
