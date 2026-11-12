@@ -53,3 +53,20 @@ Mirror Discord.Net: store when the song started, and compute `Elapsed` at render
   ```
   {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format "00" }}
   ```
+
+### Parity with the original `Activity.Elapsed` (verified after #6)
+
+- **Definition:** original is Discord.Net `SpotifyGame.Elapsed => DateTimeOffset.UtcNow - StartedAt` (`TimeSpan?`). Ours is `now - TrackStartedAt` (`DateTimeOffset?` → `TimeSpan?`). Same type, same calculation.
+- **Same members:** both are `System.TimeSpan` on the same runtime (both plugins use Dalamud.NET.Sdk 15.0.0), so templates see the same members: `Days`, `Hours`, `Minutes`, `Seconds`, `Milliseconds`, `Microseconds`, `Nanoseconds`, `Ticks`, `TotalDays`, `TotalHours`, `TotalMinutes`, `TotalSeconds`, `TotalMilliseconds`, `TotalMicroseconds`, `TotalNanoseconds`. Scriban differs only in version (original 7.5.0, ours 7.2.6).
+- **Proof:** `TemplateHelperCreateActivityTests.CreateActivity_Elapsed_RendersLikeTheOriginalActivity` renders the same templates against a stand-in with `SpotifyGame`'s exact `StartedAt`/`Elapsed` shape and against our `Activity`, and requires identical output (raw value, `Total*`, components, arithmetic, comparisons, null checks). With no start time, member access fails with the same Scriban error in both (can't happen in play: titles only render while playing).
+- **Original documentation:** the README lists no template variables. The config window's "Available Template Variables" table is generated from the activity type's properties, so it has one row `Activity.Elapsed` with its type; the `TimeSpan` members aren't listed anywhere. Ours matches: one `Activity.Elapsed` (System.TimeSpan) row in the config window, plus one README row. Decision 2026-11-12: keep the README row as is; no changes needed.
+- **Not re-added:** the original `SpotifyGame` also had `StartedAt`, `EndsAt`, `Duration`, `Remaining`, `TrackTitle` and string `Artists`. Out of scope; the spec covers `Elapsed` only.
+- **Manual check template** (cycles through every member every 4 s; each step fits in 32 characters):
+  ```
+  {{- e = Activity.Elapsed
+  names = ["Elapsed", "Days", "Hours", "Minutes", "Seconds", "Ms", "Us", "Ns", "Ticks", "TotDays", "TotHours", "TotMin", "TotSec", "TotMs", "TotUs", "TotNs"]
+  values = [e, e.Days, e.Hours, e.Minutes, e.Seconds, e.Milliseconds, e.Microseconds, e.Nanoseconds, e.Ticks, e.TotalDays, e.TotalHours, e.TotalMinutes, e.TotalSeconds, e.TotalMilliseconds, e.TotalMicroseconds, e.TotalNanoseconds]
+  i = (Context.SecsElapsed / 4 | math.floor) % (names | array.size)
+  names[i] + " " + values[i]
+  -}}
+  ```
