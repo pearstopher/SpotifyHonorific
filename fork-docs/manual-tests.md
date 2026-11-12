@@ -24,7 +24,7 @@ Result 2026-11-12: pass (dev plugin reloaded at 10:31:28, title kept updating).
 
 ## Baseline: current timer `Context.SecsElapsed` (#4)
 
-Records how the existing timer behaves, to compare with Spotify's own clock. Have the Spotify app open so you can see its position.
+Records how the existing `Context.SecsElapsed` timer behaves, so the playback-position variable we're re-adding (from the original DiscordActivityHonorific) can be compared against it. Have the Spotify app open so you can see its position.
 
 Setup:
 1. `/spotifyhonorific config` → Active Config: click **New**. Make the new config active.
@@ -44,5 +44,5 @@ Steps (for each, write what the title shows next to Spotify's position):
 
 Afterwards, switch Active Config back to your usual one (you can delete the test config).
 
-Result 2026-11-12 (baseline, current behaviour): `Context.SecsElapsed` restarts at 0 whenever the song starts or resumes, no matter how far into the song playback is. It never reflects Spotify's position. Log matches: pausing clears the title (`ClearCharacterTitle IPC` at 10:32:57), which resets the timer.
+Result 2026-11-12: `Context.SecsElapsed` is the number of seconds the current template context has been active. A new context starts when a song starts or resumes, so it reads 0 there, wherever playback is in the song. That suits time-based effects like cycling text; it isn't meant to show the song's position, which is what the re-added variable is for. Log matches: pausing clears the title (`ClearCharacterTitle IPC` at 10:32:57), and a new context starts on resume.
 
