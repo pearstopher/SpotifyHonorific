@@ -46,7 +46,7 @@ Afterwards, switch Active Config back to your usual one (you can delete the test
 
 Result 2026-11-12: `Context.SecsElapsed` is the number of seconds the current template context has been active. A new context starts when a song starts or resumes, so it reads 0 there, wherever playback is in the song. That suits time-based effects like cycling text; it isn't meant to show the song's position, which is what the re-added variable is for. Log matches: pausing clears the title (`ClearCharacterTitle IPC` at 10:32:57), and a new context starts on resume.
 
-## Re-added `Activity.Elapsed` (#6)
+## Re-added `Activity.Elapsed` (#6) — superseded by `Activity.ElapsedMs` (#16)
 
 Checks that `Activity.Elapsed` shows how far into the song playback is, matching Spotify. Have the Spotify app open so you can see its position. Claude has rebuilt the dev plugin.
 
@@ -68,4 +68,23 @@ Steps (for each, compare the title's `m:ss` with Spotify's position; the `T` num
 7. Switch to your usual template: it still works as before.
 
 Result 2026-11-12: pass. Minutes and seconds follow Spotify's position; `Context.SecsElapsed` (`T`) counts as before. Template parity with the original `Activity.Elapsed` (incl. `TotalSeconds`) is covered by unit tests (`CreateActivity_Elapsed_RendersLikeTheOriginalActivity`).
+
+## `Activity.ElapsedMs` (#16)
+
+Checks that `Activity.ElapsedMs` (milliseconds, like `Activity.DurationMs`) follows Spotify's position. Have the Spotify app open. Claude has rebuilt the dev plugin.
+
+Setup:
+1. `/spotifyhonorific config` → "Available Template Variables": `Activity.ElapsedMs` (System.Int32) is listed right after `Activity.DurationMs`; `Activity.Elapsed` is gone.
+2. Set the test config's Title Template to:
+   ```
+   {{ Activity.ElapsedMs // 60000 }}:{{ Activity.ElapsedMs // 1000 % 60 | math.format "00" }} T{{ Context.SecsElapsed | math.floor }}
+   ```
+   The Live Preview shows `0:00 T0` (no error).
+
+Steps (compare the title's `m:ss` with Spotify's position; `T` is `Context.SecsElapsed`):
+1. **Start** a song from the beginning. Wait ~30 s. `m:ss` matches Spotify (within ~1–2 s).
+2. **Pause** ~10 s, then **resume**. The title comes back at Spotify's position; `T` restarts at 0.
+3. **Seek** to around 2:00. Within a few seconds `m:ss` jumps to ~2:00.
+4. **Skip** to the next song. `m:ss` starts again from ~0:00.
+5. Optional, remaining time: `{{ (Activity.DurationMs - Activity.ElapsedMs) // 1000 }}` counts down to 0 by the end of the song.
 
