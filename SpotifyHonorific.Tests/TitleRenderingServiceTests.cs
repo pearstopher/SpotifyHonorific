@@ -156,3 +156,73 @@ public class TitleRenderingServiceOverflowTests
         _chatGui.DidNotReceive().PrintError(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<ushort?>());
     }
 }
+
+public class TitleRenderingServiceActivityElapsedTests
+{
+    private readonly TitleRenderingService _service;
+
+    public TitleRenderingServiceActivityElapsedTests()
+    {
+        var cache = new TemplateCache(Substitute.For<IPluginLog>());
+        _service = new TitleRenderingService(cache, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
+    }
+
+    private static FullTrack MakeTrack() => new()
+    {
+        Id = "track1",
+        Name = "Never Gonna Give You Up",
+        Artists = [new SimpleArtist { Name = "Rick Astley" }],
+        Album = new SimpleAlbum { Name = "Whenever You Need Somebody" },
+        DurationMs = 213_000,
+    };
+
+    // Seconds into the track, plus a little slack so a slow test run can't
+    // tip the rendered value over to the next second.
+    private static UpdaterContext ContextAt(double secondsIntoTrack) => new()
+    {
+        TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(secondsIntoTrack + 0.2),
+    };
+
+    private string? Render(string template, UpdaterContext context)
+        => _service.RenderTitle(new ActivityConfig { TitleTemplate = template }, MakeTrack(), context);
+
+    [Fact]
+    public void RenderTitle_ActivityElapsed_RendersMinutesAndSeconds()
+    {
+        Render("{{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format \"00\" }}", ContextAt(83))
+            .Should().Be("1:23");
+    }
+
+    [Fact]
+    public void RenderTitle_ActivityElapsedTotalSeconds_Renders()
+    {
+        Render("{{ Activity.Elapsed.TotalSeconds | math.floor }}", ContextAt(83))
+            .Should().Be("83");
+    }
+
+    [Fact]
+    public void RenderTitle_ReadmeSongPositionExample_Renders()
+    {
+        Render("{{ Activity.Name | string.truncate 26 }} {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format \"00\" }}", ContextAt(65))
+            .Should().Be("Never Gonna Give You Up 1:05");
+    }
+
+    [Theory]
+    [InlineData("{{ Activity.Name }}", "Never Gonna Give You Up")]
+    [InlineData("{{ Activity.Artists[0].Name }}", "Rick Astley")]
+    [InlineData("{{ Activity.Album.Name }}", "Whenever You Need Somebody")]
+    [InlineData("{{ Activity.DurationMs }}", "213000")]
+    public void RenderTitle_ExistingActivityVariables_StillRender(string template, string expected)
+    {
+        Render(template, ContextAt(0)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void RenderTitle_ContextSecsElapsed_Unchanged()
+    {
+        var context = ContextAt(83);
+        context.SecsElapsed = 12.7;
+
+        Render("{{ Context.SecsElapsed | math.floor }}", context).Should().Be("12");
+    }
+}

@@ -81,6 +81,7 @@ When writing your Title Template, you can use the following variables:
 | `Activity.Artists` | List | A list of artists on the track. |
 | `Activity.Album.Name` | String | The name of the album. |
 | `Activity.DurationMs` | Int | Total duration of the track in milliseconds. |
+| `Activity.Elapsed` | TimeSpan | How far into the track playback is, as reported by Spotify (e.g. `Activity.Elapsed.Minutes`, `Activity.Elapsed.Seconds`, `Activity.Elapsed.TotalSeconds`). |
 | `Activity.Popularity` | Int | The popularity score (0-100). |
 | `Context.SecsElapsed` | Double | Seconds elapsed since the song started/plugin updated. |
 
@@ -121,6 +122,13 @@ Alternates between the song name (10 seconds) and the artist name (10 seconds), 
 {{- else -}}
     {{ Activity.Artists[0].Name | string.truncate 30 }}
 {{- end -}}♪
+```
+
+**Song position**
+Shows the song name and how far into it you are, e.g. `Never Gonna Give You Up 1:05`.
+
+```scriban
+{{ Activity.Name | string.truncate 26 }} {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format "00" }}
 ```
 
 ## Commands
