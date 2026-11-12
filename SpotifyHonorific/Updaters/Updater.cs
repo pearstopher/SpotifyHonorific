@@ -679,7 +679,6 @@ public class Updater : IDisposable
             _clearCharacterTitleSubscriber.InvokeAction(0);
         });
         _updaterContext.SecsElapsed = 0;
-        _updaterContext.TrackStartedAt = null;
         _titleState.Clear();
         _currentTrackId = null;
     }

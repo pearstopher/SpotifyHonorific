@@ -1,7 +1,6 @@
 using Scriban;
 using Scriban.Runtime;
 using SpotifyHonorific.Activities;
-using System;
 using System.Linq;
 
 namespace SpotifyHonorific.Utils;
@@ -24,17 +23,17 @@ public static class TemplateHelper
     public static bool IsTimeDependent(ActivityConfig config)
         => config.RainbowMode
            || config.TitleTemplate.Contains("Context")
-           || config.TitleTemplate.Contains("Elapsed");
+           || config.TitleTemplate.Contains("ElapsedMs");
 
     /// <summary>
     /// Builds the template's Activity: the track's own members plus ElapsedMs, how
     /// far into the track playback is in milliseconds (matching DurationMs).
     /// </summary>
-    public static ScriptObject CreateActivity(object track, DateTimeOffset? trackStartedAt, DateTimeOffset now)
+    public static ScriptObject CreateActivity(object track, int? elapsedMs)
     {
         var activity = new ScriptObject();
         activity.Import(track, ScriptMemberImportFlags.Field | ScriptMemberImportFlags.Property, renamer: member => member.Name);
-        activity["ElapsedMs"] = (int?)(now - trackStartedAt)?.TotalMilliseconds;
+        activity["ElapsedMs"] = elapsedMs;
         return activity;
     }
 }

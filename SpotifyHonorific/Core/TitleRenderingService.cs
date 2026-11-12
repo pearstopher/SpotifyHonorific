@@ -39,7 +39,7 @@ public class TitleRenderingService
             return null;
         }
 
-        var activity = TemplateHelper.CreateActivity(track, context.TrackStartedAt, DateTimeOffset.UtcNow);
+        var activity = TemplateHelper.CreateActivity(track, (int?)(DateTimeOffset.UtcNow - context.TrackStartedAt)?.TotalMilliseconds);
         var title = template.Render(new { Activity = activity, Context = context }, member => member.Name);
 
         if (title.Length > MAX_TITLE_LENGTH)

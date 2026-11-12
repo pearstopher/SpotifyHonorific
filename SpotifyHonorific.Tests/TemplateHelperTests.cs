@@ -59,6 +59,18 @@ public class TemplateHelperIsTimeDependentTests
     }
 
     [Fact]
+    public void IsTimeDependent_WordElapsedWithoutVariable_ReturnsFalse()
+    {
+        // Only the exact variable name ElapsedMs is time-varying.
+        var config = new ActivityConfig
+        {
+            TitleTemplate = "Elapsed: {{ Activity.Name }}",
+            RainbowMode = false
+        };
+        TemplateHelper.IsTimeDependent(config).Should().BeFalse();
+    }
+
+    [Fact]
     public void IsTimeDependent_LowercaseContext_ReturnsFalse()
     {
         // Scriban exposes exact member names (renamer: member => member.Name),
@@ -74,8 +86,6 @@ public class TemplateHelperIsTimeDependentTests
 
 public class TemplateHelperCreateActivityTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 11, 12, 12, 0, 0, TimeSpan.Zero);
-
     private static FullTrack MakeTrack() => new()
     {
         Id = "track1",
@@ -86,9 +96,9 @@ public class TemplateHelperCreateActivityTests
     };
 
     [Fact]
-    public void CreateActivity_ElapsedMs_IsMillisecondsSinceTrackStarted()
+    public void CreateActivity_ElapsedMs_IsTheGivenValue()
     {
-        var activity = TemplateHelper.CreateActivity(MakeTrack(), Now - TimeSpan.FromMilliseconds(83_456), Now);
+        var activity = TemplateHelper.CreateActivity(MakeTrack(), 83_456);
 
         activity["ElapsedMs"].Should().Be(83_456);
     }
@@ -96,16 +106,16 @@ public class TemplateHelperCreateActivityTests
     [Fact]
     public void CreateActivity_ElapsedMs_IsAnIntLikeDurationMs()
     {
-        var activity = TemplateHelper.CreateActivity(MakeTrack(), Now - TimeSpan.FromSeconds(83), Now);
+        var activity = TemplateHelper.CreateActivity(MakeTrack(), 83_000);
 
         activity["ElapsedMs"].Should().BeOfType<int>();
         activity["DurationMs"].Should().BeOfType<int>();
     }
 
     [Fact]
-    public void CreateActivity_NoStartTime_ElapsedMsIsNull()
+    public void CreateActivity_NoElapsed_ElapsedMsIsNull()
     {
-        var activity = TemplateHelper.CreateActivity(MakeTrack(), null, Now);
+        var activity = TemplateHelper.CreateActivity(MakeTrack(), null);
 
         activity["ElapsedMs"].Should().BeNull();
     }
@@ -113,7 +123,7 @@ public class TemplateHelperCreateActivityTests
     [Fact]
     public void CreateActivity_KeepsTrackMembers()
     {
-        var activity = TemplateHelper.CreateActivity(MakeTrack(), Now, Now);
+        var activity = TemplateHelper.CreateActivity(MakeTrack(), 0);
 
         activity["Name"].Should().Be("Song");
         activity["DurationMs"].Should().Be(213_000);
