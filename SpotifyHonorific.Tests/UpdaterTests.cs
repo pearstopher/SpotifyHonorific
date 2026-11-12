@@ -37,56 +37,6 @@ public class UpdaterTests
         // Assert
         context.SecsElapsed.Should().BeApproximately(3.8, 0.001);
     }
-
-    [Fact]
-    public void UpdaterContext_TrackStartedAt_DefaultsToNull()
-    {
-        new UpdaterContext().TrackStartedAt.Should().BeNull();
-    }
-
-    [Fact]
-    public void UpdaterContext_TrackStartedAt_IsNotATemplateVariable()
-    {
-        // The config window lists public UpdaterContext properties as template
-        // variables; the start time is exposed only as Activity.ElapsedMs.
-        typeof(UpdaterContext).GetProperties().Select(p => p.Name)
-            .Should().NotContain(nameof(UpdaterContext.TrackStartedAt));
-    }
-}
-
-public class UpdaterTrackStartedAtTests
-{
-    private static readonly DateTimeOffset Now = new(2026, 11, 12, 12, 0, 0, TimeSpan.Zero);
-
-    [Fact]
-    public void ComputeTrackStartedAt_FromProgress_IsNowMinusProgress()
-    {
-        Updater.ComputeTrackStartedAt(83_000, Now).Should().Be(Now - TimeSpan.FromSeconds(83));
-    }
-
-    [Fact]
-    public void ComputeTrackStartedAt_AtTrackStart_IsNow()
-    {
-        Updater.ComputeTrackStartedAt(0, Now).Should().Be(Now);
-    }
-
-    [Fact]
-    public void ComputeTrackStartedAt_NoProgress_IsNull()
-    {
-        Updater.ComputeTrackStartedAt(null, Now).Should().BeNull();
-    }
-
-    [Fact]
-    public void ComputeTrackStartedAt_SeekOrNewTrack_ResyncsToTheNewPosition()
-    {
-        // A later poll reporting an earlier position (seek back, or a new track)
-        // moves the start time forward instead of keeping the old one.
-        var first = Updater.ComputeTrackStartedAt(120_000, Now);
-        var afterSeek = Updater.ComputeTrackStartedAt(5_000, Now + TimeSpan.FromSeconds(2));
-
-        afterSeek.Should().Be(Now - TimeSpan.FromSeconds(3));
-        afterSeek.Should().BeAfter(first!.Value);
-    }
 }
 
 public class UpdaterIntegrationTests

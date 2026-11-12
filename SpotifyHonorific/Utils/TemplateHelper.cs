@@ -1,5 +1,4 @@
 using Scriban;
-using Scriban.Runtime;
 using SpotifyHonorific.Activities;
 using System.Linq;
 
@@ -15,25 +14,10 @@ public static class TemplateHelper
 
     /// <summary>
     /// True if the rendered title can change over time: rainbow mode animates the
-    /// color, and "Context" and "Activity.ElapsedMs" are the time-varying render
-    /// variables (exact member names; Scriban's renamer exposes property names
-    /// verbatim). False positives only cause unnecessary re-renders, which is the
-    /// safe direction.
+    /// color, and "Context" and "ProgressMs" are the time-varying render variables (exact member
+    /// name; Scriban's renamer exposes property names verbatim). False positives
+    /// only cause unnecessary re-renders, which is the safe direction.
     /// </summary>
     public static bool IsTimeDependent(ActivityConfig config)
-        => config.RainbowMode
-           || config.TitleTemplate.Contains("Context")
-           || config.TitleTemplate.Contains("ElapsedMs");
-
-    /// <summary>
-    /// Builds the template's Activity: the track's own members plus ElapsedMs, how
-    /// far into the track playback is in milliseconds (matching DurationMs).
-    /// </summary>
-    public static ScriptObject CreateActivity(object track, int? elapsedMs)
-    {
-        var activity = new ScriptObject();
-        activity.Import(track, ScriptMemberImportFlags.Field | ScriptMemberImportFlags.Property, renamer: member => member.Name);
-        activity["ElapsedMs"] = elapsedMs;
-        return activity;
-    }
+        => config.RainbowMode || config.TitleTemplate.Contains("Context") || config.TitleTemplate.Contains("ProgressMs");
 }
