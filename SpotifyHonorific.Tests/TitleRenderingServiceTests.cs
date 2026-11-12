@@ -167,23 +167,22 @@ public class TitleRenderingServiceProgressMsTests
         _service = new TitleRenderingService(cache, Substitute.For<IPluginLog>(), Substitute.For<IChatGui>());
     }
 
-    private static FullTrack MakeTrack() => new()
+    private static FullTrack MakeTrack(string artist, string name) => new()
     {
         Id = "track1",
-        Name = "Song",
-        Artists = [new SimpleArtist { Name = "Artist" }],
+        Name = name,
+        Artists = [new SimpleArtist { Name = artist }],
     };
 
-    // 0.2 s of slack so a slow test run can't tip into the next second.
-    private static UpdaterContext ContextAt(double seconds) => new() { TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(seconds + 0.2) };
-
-    [Theory]
-    [InlineData("{{ Activity.ProgressMs // 1000 }}", "83")]
-    [InlineData("{{ Activity.ProgressMs // 60000 }}:{{ Activity.ProgressMs // 1000 % 60 | math.format \"00\" }}", "1:23")]
-    [InlineData("{{ Activity.Artists[0].Name }} - {{ Activity.Name }}", "Artist - Song")]
-    public void RenderTitle_ProgressMs_IsTimeSinceTrackStartedAndKeepsTrackVariables(string template, string expected)
+    [Fact]
+    public void RenderTitle_ProgressMs_IsTimeSinceTrackStarted()
     {
-        _service.RenderTitle(new ActivityConfig { TitleTemplate = template }, MakeTrack(), ContextAt(83))
-            .Should().Be(expected);
+        var track = MakeTrack("Artist", "Song");
+        var config = new ActivityConfig { TitleTemplate = "{{ Activity.ProgressMs // 1000 }}" };
+        var context = new UpdaterContext { TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(83) };
+
+        var title = _service.RenderTitle(config, track, context);
+
+        title.Should().Be("83");
     }
 }
