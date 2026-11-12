@@ -54,7 +54,16 @@ Mirror Discord.Net: store when the song started, and compute `Elapsed` at render
   {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format "00" }}
   ```
 
-### Parity with the original `Activity.Elapsed` (verified after #6)
+### Decision: `Activity.ElapsedMs` instead of `Activity.Elapsed` (#16, 2026-11-12)
+
+- **Decision:** expose the playback position as a single `Activity.ElapsedMs` (Int, milliseconds), replacing the TimeSpan `Activity.Elapsed` from #6 before anything goes upstream.
+- **Why:** SpotifyHonorific's `Activity` is a Spotify track with a small set of simple variables (`Activity.DurationMs` is an Int in milliseconds; there's no `System.TimeSpan` anywhere). `ElapsedMs` matches `DurationMs`, so position and duration work the same way (remaining = `Activity.DurationMs - Activity.ElapsedMs`). The original's TimeSpan members aren't reproduced.
+- **Code:** one-line change in `TemplateHelper.CreateActivity` (`activity["ElapsedMs"] = (int?)(now - trackStartedAt)?.TotalMilliseconds`). Same wrapper and start-time tracking; `IsTimeDependent` already matches `Elapsed`. Config window and README rows: `Activity.ElapsedMs` | Int. The TimeSpan parity tests were removed.
+- **Template example:** `{{ Activity.ElapsedMs // 60000 }}:{{ Activity.ElapsedMs // 1000 % 60 | math.format "00" }}` (`//` is Scriban's integer division).
+
+The section below records the earlier `Activity.Elapsed` version (#6) and is kept for history.
+
+### Parity with the original `Activity.Elapsed` (verified after #6; superseded by #16)
 
 - **Definition:** original is Discord.Net `SpotifyGame.Elapsed => DateTimeOffset.UtcNow - StartedAt` (`TimeSpan?`). Ours is `now - TrackStartedAt` (`DateTimeOffset?` → `TimeSpan?`). Same type, same calculation.
 - **Same members:** both are `System.TimeSpan` on the same runtime (both plugins use Dalamud.NET.Sdk 15.0.0), so templates see the same members: `Days`, `Hours`, `Minutes`, `Seconds`, `Milliseconds`, `Microseconds`, `Nanoseconds`, `Ticks`, `TotalDays`, `TotalHours`, `TotalMinutes`, `TotalSeconds`, `TotalMilliseconds`, `TotalMicroseconds`, `TotalNanoseconds`. Scriban differs only in version (original 7.5.0, ours 7.2.6).
