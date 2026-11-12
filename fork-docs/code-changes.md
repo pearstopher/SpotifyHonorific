@@ -1,6 +1,12 @@
-# Code changes: `Activity.ElapsedMs`
+# Code changes: `Activity.ProgressMs`
 
-Fork-only. Every line added or modified to re-add the song's playback position as `Activity.ElapsedMs`, shown and explained, with how each change follows the original [DiscordActivityHonorific](https://github.com/anya-hichu/DiscordActivityHonorific) (anya's plugin, "the original" below). This is the net change against upstream: `git diff upstream/master -- SpotifyHonorific SpotifyHonorific.Tests README.md`. Plugin code: 5 files, 39 lines added and 6 replaced (counting comments and blank lines). Issues: #6 (re-add the variable), #16 (`ElapsedMs`), #20 and #22 (this document, and aligning with the original).
+Fork-only. Every line added or modified to re-add the song's playback position as `Activity.ProgressMs`, shown and explained, with how each line follows the original [DiscordActivityHonorific](https://github.com/anya-hichu/DiscordActivityHonorific) (anya's plugin, "the original" below). This is the net change against upstream: `git diff upstream/master -- SpotifyHonorific SpotifyHonorific.Tests README.md`.
+
+- **Plugin code:** 5 files, 11 lines added, 4 lines replaced. No new `using` lines, no new methods.
+- **README:** 1 line added.
+- **Tests:** 21 lines added (5 test cases); no existing test changed. 262 tests pass.
+
+Issues: #6 (re-add the variable), #16 (milliseconds), #22 (align with the original), #25 (`ProgressMs`, minimal change).
 
 ## How the original did it
 
@@ -17,29 +23,25 @@ public DateTimeOffset? StartedAt { get; internal set; }
 public TimeSpan? Elapsed => DateTimeOffset.UtcNow - StartedAt;
 ```
 
-Discord sends a new presence (with a new `StartedAt`) when a song starts, resumes or is seeked, so `Elapsed` follows playback. The original re-rendered the title every 100 ms. It had no live preview, no README variable docs and no tests; its config window listed variables by reflecting over the activity type.
+Discord sends a new presence, with a new `StartedAt`, when a song starts, resumes or is seeked. The original re-rendered the title every 100 ms. It had no live preview, no README variable list and no tests; its config window listed variables by reflecting over the activity type.
 
 ## How this follows it
 
-The same two-part pattern: **store when the song started; compute the position at render time.**
+The same pattern: **store when the song started; compute the position at render time.**
 
-1. **Every Spotify poll while a song plays** (`Updater.ProcessPollResult`): Spotify reports `progress_ms`. The updater stores the start time (`now - progress`) in `UpdaterContext.TrackStartedAt`. This plays the role of Discord's `StartedAt`, refreshed by each poll instead of each presence update.
-2. **Every render** (`TitleRenderingService.RenderTitle`): `ElapsedMs = now - TrackStartedAt`, the same calculation as `SpotifyGame.Elapsed`, in whole milliseconds. The track is wrapped so templates see it as `Activity.ElapsedMs`, alongside the track's usual variables.
-3. **Re-rendering**: templates using `ElapsedMs` are marked time-dependent so they keep updating.
-4. **Discoverability**: config window variable table, Live Preview and README.
-
-`Context.SecsElapsed` is untouched.
+1. Each Spotify poll while playing stores the start time (`now - progress_ms`). This is the equivalent of Discord's `StartedAt`.
+2. Each render computes `ProgressMs = now - start`, the same calculation as `Elapsed`, and puts it on `Activity` next to the track's own variables.
 
 ### Differences from the original, and why
 
 | Original | Here | Why |
 |---|---|---|
-| `Activity.Elapsed`, a `TimeSpan` | `Activity.ElapsedMs`, an `int` in milliseconds | Design decision (#16): this plugin's `Activity` is a Spotify track whose variables are simple values (`DurationMs` is an `int` in ms; no `TimeSpan` anywhere). `ElapsedMs` matches `DurationMs`. |
-| Start time from Discord presence timestamps | Start time from Spotify's `progress_ms` on each poll | SpotifyHonorific talks to the Spotify Web API, not Discord. Same idea, different source. |
-| Start time lives on the activity object | Start time lives on `UpdaterContext` (internal), and `Activity` is a wrapper | `Activity` here is the Spotify library's `FullTrack`, which can't be given new members, so the track is wrapped to add `ElapsedMs`. |
-| Title re-rendered every 100 ms regardless | Upstream only keeps re-rendering titles it considers time-dependent | Upstream's own optimisation (not in the original). `ElapsedMs` has to be added to its check, or such titles would freeze. |
-| Variable table built by reflection | One hard-coded row | Upstream hard-codes its `Activity.*` rows. |
-| No live preview, README docs or tests | Preview, README row + example, unit tests | Upstream has all three; following upstream's conventions. |
+| `Activity.Elapsed`, a `TimeSpan` | `Activity.ProgressMs`, an `int` in milliseconds | Design decision: this plugin's track variables are simple values, and `Activity.DurationMs` is an `int` in ms. `ProgressMs` matches it, and is Spotify's own name for this value (`progress_ms`). |
+| Start time from Discord presence timestamps | Start time from Spotify's `progress_ms` on each poll | This plugin talks to the Spotify Web API, not Discord. |
+| Start time and `Elapsed` live on the activity object | Start time on `UpdaterContext` (internal); `Activity` is a small wrapper | `Activity` here is the Spotify library's `FullTrack`, which can't be given new members. |
+| Re-rendered every 100 ms regardless | `ProgressMs` added to upstream's time-dependence check | Upstream only keeps re-rendering titles it considers time-dependent; without this, a `ProgressMs` title would freeze. |
+| Variable table by reflection | One hard-coded row | Upstream hard-codes its `Activity.*` rows. |
+| No live preview, README list or tests | Preview shows 0, one README row, tests | Following upstream's conventions. |
 
 ---
 
@@ -47,163 +49,74 @@ The same two-part pattern: **store when the song started; compute the position a
 
 ### `SpotifyHonorific/Updaters/UpdaterContext.cs`
 
-Holds the song's start time: the equivalent of the original's `SpotifyGame.StartedAt`.
-
 ```diff
-+using System;
-+
- namespace SpotifyHonorific.Updaters;
-
- public class UpdaterContext
- {
      public double SecsElapsed { get; set; }
-+
-+    // When the current track started playing, per Spotify's reported progress.
-+    // Internal so it stays out of the template variables; templates see it as
-+    // Activity.ElapsedMs.
-+    internal DateTimeOffset? TrackStartedAt { get; set; }
++    internal System.DateTimeOffset? TrackStartedAt { get; set; }
  }
 ```
 
 | Line | Explanation | Original |
 |---|---|---|
-| `using System;` | Needed for `DateTimeOffset`; the project doesn't use implicit usings. | — |
-| (blank lines) | Spacing, matching the other files. | — |
-| `// When the current track started…` (3 lines) | What the value is, and why it's `internal`: templates and the config window only see **public** `UpdaterContext` properties, so it doesn't become a `Context.*` variable. | The original exposed `StartedAt` publicly as `Activity.StartedAt`. Not re-added here (out of scope). |
-| `internal DateTimeOffset? TrackStartedAt { get; set; }` | The stored start time. Nullable: none until the first playing poll. | Same type as `SpotifyGame.StartedAt` (`DateTimeOffset?`). |
+| `internal System.DateTimeOffset? TrackStartedAt { get; set; }` | When the current song started, from Spotify's progress. `internal`, so templates and the config window (which only see public properties) don't get a new `Context.*` variable. `System.` written out instead of adding a `using` line. Nullable: none until the first playing poll. | Same type as `SpotifyGame.StartedAt`. The original kept it on the activity; here the context is the object the plugin owns and passes to every render. |
 
 ### `SpotifyHonorific/Updaters/Updater.cs`
-
-Sets the start time on each playing poll.
 
 ```diff
          if (outcome == PollOutcome.Playing && track != null)
          {
-+            // Resync on every poll, not just new tracks, so seeks are picked up.
-+            _updaterContext.TrackStartedAt = ComputeTrackStartedAt(result?.ProgressMs, DateTimeOffset.UtcNow);
++            _updaterContext.TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromMilliseconds(result!.ProgressMs ?? 0);
              _isMusicPlaying = true;
 ```
 
 | Line | Explanation | Original |
 |---|---|---|
-| `// Resync on every poll…` | Explains the placement: before `ProcessCurrentlyPlayingTrack`, which returns early when the song hasn't changed and would otherwise miss seeks. | In the original, every presence update brought a fresh `StartedAt`; this is the per-poll equivalent. |
-| `_updaterContext.TrackStartedAt = ComputeTrackStartedAt(result?.ProgressMs, DateTimeOffset.UtcNow);` | Stores the start time from Spotify's `ProgressMs` (already fetched by every poll; previously only used to pick the poll interval). | Discord.Net set `StartedAt` from the presence. |
+| `_updaterContext.TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromMilliseconds(result!.ProgressMs ?? 0);` | On every poll that finds a song playing, the start time is "now minus how far in Spotify says we are". Placed before `ProcessCurrentlyPlayingTrack` (which returns early when the song hasn't changed), so it runs on every poll and picks up seeks. `ProgressMs` was already fetched by every poll and only used for the poll interval. `result!` is safe: the outcome is only `Playing` when there's a result. `?? 0` treats a missing progress as the start of the song. | Discord.Net set `StartedAt` from each presence update; this is the per-poll equivalent. |
 
-```diff
-+    internal static DateTimeOffset? ComputeTrackStartedAt(int? progressMs, DateTimeOffset now)
-+        => progressMs is { } ms ? now - TimeSpan.FromMilliseconds(ms) : null;
-+
-```
-
-| Line | Explanation | Original |
-|---|---|---|
-| `internal static DateTimeOffset? ComputeTrackStartedAt(…)` | The calculation as a small `internal static` helper, upstream's pattern for testable logic (`ComputeNextPollInterval`, `CheckRenderDue`). `now` is a parameter so tests can fix the clock. | No equivalent: Discord did this server-side. |
-| `=> progressMs is { } ms ? now - TimeSpan.FromMilliseconds(ms) : null;` | With progress: the song started `progress` ms before now. Without: no start time. | — |
-| (blank line) | Spacing. | — |
-
-Nothing is reset when the title clears. After a clear nothing renders, and the next playing poll always sets a fresh start time before the next render. That matches the original, where the old activity was simply replaced.
-
-### `SpotifyHonorific/Utils/TemplateHelper.cs`
-
-Marks `ElapsedMs` templates as time-dependent, and builds the wrapped `Activity`.
-
-```diff
- using Scriban;
-+using Scriban.Runtime;
- using SpotifyHonorific.Activities;
-```
-
-| Line | Explanation | Original |
-|---|---|---|
-| `using Scriban.Runtime;` | For `ScriptObject` and `ScriptMemberImportFlags`. | Not needed there: no wrapper. |
-
-```diff
-     /// <summary>
-     /// True if the rendered title can change over time: rainbow mode animates the
--    /// color, and "Context" is the only time-varying render variable (exact member
--    /// name; Scriban's renamer exposes property names verbatim). False positives
--    /// only cause unnecessary re-renders, which is the safe direction.
-+    /// color, and "Context" and "Activity.ElapsedMs" are the time-varying render
-+    /// variables (exact member names; Scriban's renamer exposes property names
-+    /// verbatim). False positives only cause unnecessary re-renders, which is the
-+    /// safe direction.
-     /// </summary>
-     public static bool IsTimeDependent(ActivityConfig config)
--        => config.RainbowMode || config.TitleTemplate.Contains("Context");
-+        => config.RainbowMode
-+           || config.TitleTemplate.Contains("Context")
-+           || config.TitleTemplate.Contains("ElapsedMs");
-```
-
-| Line | Explanation | Original |
-|---|---|---|
-| Doc comment (4 lines modified) | Same comment, now naming `Activity.ElapsedMs` as a time-varying variable too. | The original had no such check (it re-rendered every 100 ms). |
-| `=> config.RainbowMode` / `\|\| …Contains("Context")` | Unchanged conditions, split onto separate lines. | — |
-| `\|\| config.TitleTemplate.Contains("ElapsedMs")` | A template using `ElapsedMs` changes over time, so it keeps re-rendering (every 0.5 s). Without this, a template using only `ElapsedMs` would render once and freeze. Matches the exact name only, so the plain word "Elapsed" in a title doesn't trigger it. | Equivalent to the original's always-re-render, limited to templates that need it. |
-
-```diff
-+
-+    /// <summary>
-+    /// Builds the template's Activity: the track's own members plus ElapsedMs, how
-+    /// far into the track playback is in milliseconds (matching DurationMs).
-+    /// </summary>
-+    public static ScriptObject CreateActivity(object track, int? elapsedMs)
-+    {
-+        var activity = new ScriptObject();
-+        activity.Import(track, ScriptMemberImportFlags.Field | ScriptMemberImportFlags.Property, renamer: member => member.Name);
-+        activity["ElapsedMs"] = elapsedMs;
-+        return activity;
-+    }
-```
-
-| Line | Explanation | Original |
-|---|---|---|
-| (blank line), doc comment | Spacing, and what `Activity` now contains. | — |
-| `public static ScriptObject CreateActivity(object track, int? elapsedMs)` | Shared by real renders and the Live Preview. Takes the elapsed value already worked out, so it's a plain function. `track` is `object` because the preview may pass a mock track. | The original passed the activity object directly; a wrapper wasn't needed because `SpotifyGame` already had `Elapsed`. |
-| `var activity = new ScriptObject();` | A Scriban object (a dictionary of template variables), because `FullTrack` can't be given new members. | — |
-| `activity.Import(track, …Field \| …Property, renamer: member => member.Name);` | Copies the track's public fields and properties under their exact names, so every existing `Activity.*` variable works as before. `member => member.Name` is the same renamer the plugin passes to `Render`. | Same naming as the original's render (`member => member.Name`). |
-| `activity["ElapsedMs"] = elapsedMs;` | Adds `Activity.ElapsedMs`. | The original's `Activity.Elapsed`, as milliseconds. |
-| `return activity;` | The object templates see as `Activity`. | — |
+Nothing is reset when the title clears: nothing renders after a clear, and the next playing poll always sets a fresh start time first. In the original, the old activity was likewise just replaced.
 
 ### `SpotifyHonorific/Core/TitleRenderingService.cs`
 
-Computes `ElapsedMs` and renders with the wrapped `Activity`.
-
-```diff
- using SpotifyHonorific.Updaters;
-+using SpotifyHonorific.Utils;
-+using System;
- using System.Collections.Generic;
-```
-
-| Line | Explanation | Original |
-|---|---|---|
-| `using SpotifyHonorific.Utils;` | For `TemplateHelper`. | — |
-| `using System;` | For `DateTimeOffset`. | — |
-
 ```diff
 -        var title = template.Render(new { Activity = track, Context = context }, member => member.Name);
-+        var activity = TemplateHelper.CreateActivity(track, (int?)(DateTimeOffset.UtcNow - context.TrackStartedAt)?.TotalMilliseconds);
++        var activity = new Scriban.Runtime.ScriptObject { ["ProgressMs"] = (int?)(System.DateTimeOffset.UtcNow - context.TrackStartedAt)?.TotalMilliseconds };
++        Scriban.Runtime.ScriptObjectExtensions.Import(activity, track, renamer: member => member.Name);
 +        var title = template.Render(new { Activity = activity, Context = context }, member => member.Name);
 ```
 
 | Line | Explanation | Original |
 |---|---|---|
-| `var activity = TemplateHelper.CreateActivity(track, (int?)(DateTimeOffset.UtcNow - context.TrackStartedAt)?.TotalMilliseconds);` | `ElapsedMs` = now minus the stored start time, in whole milliseconds (`int`, like `DurationMs`), worked out at every render so it keeps counting between polls. `null` before any start time. | Same calculation as `SpotifyGame.Elapsed => DateTimeOffset.UtcNow - StartedAt`, done at render time like the original. |
-| `var title = template.Render(new { Activity = activity, Context = context }, member => member.Name);` | Modified: `Activity = activity` (the wrapper) instead of `Activity = track`; otherwise the same call. | Identical shape to the original's `Render(new { Activity = activity, Context = UpdaterContext }, member => member.Name)`. |
+| `var activity = new Scriban.Runtime.ScriptObject { ["ProgressMs"] = … };` | Creates the template's `Activity`: a Scriban object (a dictionary of template variables), starting with `ProgressMs` = now minus the start time, in whole milliseconds (`int`, like `DurationMs`). Computed at every render, so it keeps counting between polls. `null` before the first playing poll. | The same calculation as `SpotifyGame.Elapsed => DateTimeOffset.UtcNow - StartedAt`, also done at render time. The wrapper is needed only because `FullTrack` can't hold a new property; the original's object already had `Elapsed`. |
+| `Scriban.Runtime.ScriptObjectExtensions.Import(activity, track, renamer: member => member.Name);` | Copies the track's public members into the same object under their exact names, so `Activity.Name`, `Activity.Artists`, `Activity.DurationMs` and the rest work exactly as before. `Import` is an extension method; it's called by its full name to avoid a new `using` line. | Same naming as the original's render (`member => member.Name`). |
+| `var title = template.Render(new { Activity = activity, Context = context }, member => member.Name);` | Modified: `Activity = activity` instead of `Activity = track`; otherwise the same call. | Identical shape to the original's render call. |
 
-### `SpotifyHonorific/Windows/ConfigWindow.cs`
-
-Live Preview and the "Available Template Variables" table.
+### `SpotifyHonorific/Utils/TemplateHelper.cs`
 
 ```diff
-         var mockContext = new UpdaterContext { SecsElapsed = 0 };
-+        var activity = TemplateHelper.CreateActivity(track, 0);
+     /// True if the rendered title can change over time: rainbow mode animates the
+-    /// color, and "Context" is the only time-varying render variable (exact member
++    /// color, and "Context" and "ProgressMs" are the time-varying render variables (exact member
+     /// name; Scriban's renamer exposes property names verbatim). False positives
+     /// only cause unnecessary re-renders, which is the safe direction.
+     /// </summary>
+     public static bool IsTimeDependent(ActivityConfig config)
+-        => config.RainbowMode || config.TitleTemplate.Contains("Context");
++        => config.RainbowMode || config.TitleTemplate.Contains("Context") || config.TitleTemplate.Contains("ProgressMs");
 ```
 
 | Line | Explanation | Original |
 |---|---|---|
-| `var activity = TemplateHelper.CreateActivity(track, 0);` | The preview shows `ElapsedMs` as 0, just as it shows `SecsElapsed` as 0. Upstream's mock context is left unchanged. | The original had no live preview. |
+| Comment line | Updated so it no longer says `Context` is the only time-varying variable. | — |
+| `=> … \|\| config.TitleTemplate.Contains("ProgressMs");` | A template using `ProgressMs` changes over time, so the updater keeps re-rendering it (every 0.5 s). Without this, a template using only `ProgressMs` would render once and freeze. Matches the exact name only. | The original had no such check; it re-rendered every 100 ms. This gives the same result for templates that need it. |
+
+### `SpotifyHonorific/Windows/ConfigWindow.cs`
+
+**Live Preview:**
+
+```diff
+         var mockContext = new UpdaterContext { SecsElapsed = 0 };
++        var activity = new Scriban.Runtime.ScriptObject { ["ProgressMs"] = 0 };
++        Scriban.Runtime.ScriptObjectExtensions.Import(activity, track, renamer: member => member.Name);
+```
 
 ```diff
 -                var renderedTitle = titleTemplate.Render(new { Activity = track, Context = mockContext }, member => member.Name);
@@ -212,16 +125,20 @@ Live Preview and the "Available Template Variables" table.
 
 | Line | Explanation | Original |
 |---|---|---|
-| `var renderedTitle = …Render(new { Activity = activity, … })` | Modified: preview renders with the wrapped `Activity`, like real titles. | — |
+| `var activity = new Scriban.Runtime.ScriptObject { ["ProgressMs"] = 0 };` | The preview's `Activity` shows `ProgressMs` as 0, just as the preview shows `SecsElapsed` as 0. | The original had no live preview. |
+| `Scriban.Runtime.ScriptObjectExtensions.Import(activity, track, …);` | Same as in the real render: the current (or mock) track's variables. | — |
+| `var renderedTitle = …Render(new { Activity = activity, … })` | Modified: the preview renders with the same kind of `Activity` as real titles. | — |
+
+**Variable table:**
 
 ```diff
-             ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.DurationMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
-+            ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.ElapsedMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
+             …ImGui.Text("Activity.DurationMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
++            ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.Text("Activity.ProgressMs"); ImGui.TableNextColumn(); ImGui.Text("System.Int32");
 ```
 
 | Line | Explanation | Original |
 |---|---|---|
-| `…ImGui.Text("Activity.ElapsedMs"); … ImGui.Text("System.Int32");` | One row after `Activity.DurationMs`, in upstream's hard-coded format. | The original listed every activity property by reflection, including `Activity.Elapsed`, as one row with its type. Same result: one row for the variable. |
+| `…ImGui.Text("Activity.ProgressMs"); … ImGui.Text("System.Int32");` | One row after `Activity.DurationMs` in "Available Template Variables", in upstream's hard-coded format. | The original's table listed `Activity.Elapsed` as one row (by reflection). Same result: one row for the variable. |
 
 ---
 
@@ -229,84 +146,71 @@ Live Preview and the "Available Template Variables" table.
 
 ```diff
  | `Activity.DurationMs` | Int | Total duration of the track in milliseconds. |
-+| `Activity.ElapsedMs` | Int | How far into the track playback is in milliseconds, as reported by Spotify. |
++| `Activity.ProgressMs` | Int | How far into the track playback is in milliseconds. |
 ```
 
 | Line | Explanation | Original |
 |---|---|---|
-| `\| Activity.ElapsedMs \| Int \| …` | New row after `Activity.DurationMs`, same format. Upstream's `Context.SecsElapsed` row is left as it is. | The original's README listed no variables. |
-
-```diff
-+**Song position**
-+Shows the song name and how far into it you are, e.g. `Never Gonna Give You Up 1:05`.
-+
-+```scriban
-+{{ Activity.Name | string.truncate 26 }} {{ Activity.ElapsedMs // 60000 }}:{{ Activity.ElapsedMs // 1000 % 60 | math.format "00" }}
-+```
-+
-```
-
-| Line | Explanation | Original |
-|---|---|---|
-| Heading, description, blank line | In the style of upstream's other examples. | — |
-| Opening fence (`scriban`) / closing fence | Same code-block style as the other examples. | — |
-| `{{ Activity.Name \| string.truncate 26 }} …` | Song name (≤ 26 chars), space, minutes (`ElapsedMs // 60000`; `//` is Scriban's whole-number division), `:`, seconds padded to two digits. At most 32 characters, Honorific's limit. Verified by a unit test. | — |
-| (blank line) | Spacing. | — |
+| `\| Activity.ProgressMs \| Int \| …` | One row after `Activity.DurationMs`, same format. | The original's README listed no variables. |
 
 ---
 
 ## Tests
 
-All added; no existing upstream test was changed. 277 tests pass. (The original had no tests; these follow upstream's test project.)
-
-### `SpotifyHonorific.Tests/UpdaterTests.cs`
-
-| Test | What it checks |
-|---|---|
-| `UpdaterContext_TrackStartedAt_DefaultsToNull` | No start time until a playing poll sets one. |
-| `UpdaterContext_TrackStartedAt_IsNotATemplateVariable` | `GetProperties()` (what the config window lists) doesn't see `TrackStartedAt`, so no `Context.TrackStartedAt` variable appears. |
-| `UpdaterTrackStartedAtTests` (fixed clock): `ComputeTrackStartedAt_FromProgress_IsNowMinusProgress` | 83,000 ms of progress → started 83 s before now. |
-| `ComputeTrackStartedAt_AtTrackStart_IsNow` | Progress 0 → started now. |
-| `ComputeTrackStartedAt_NoProgress_IsNull` | No progress → no start time. |
-| `ComputeTrackStartedAt_SeekOrNewTrack_ResyncsToTheNewPosition` | A later poll at an earlier position (seek back or new song) replaces the start time; this is how seeks are followed. |
+All added; 262 pass (upstream's 257 + 5).
 
 ### `SpotifyHonorific.Tests/TemplateHelperTests.cs`
 
-`using SpotifyAPI.Web;` is added for the test track types.
+```csharp
+[Theory]
+[InlineData("{{ Activity.ProgressMs // 1000 }}", true)]
+[InlineData("Progress: {{ Activity.Name }}", false)]
+public void IsTimeDependent_OnlyExactProgressMs_ReturnsTrue(string template, bool expected)
+{
+    TemplateHelper.IsTimeDependent(new ActivityConfig { TitleTemplate = template }).Should().Be(expected);
+}
+```
 
-| Test | What it checks |
-|---|---|
-| `IsTimeDependent_TemplateReferencesActivityElapsedMs_ReturnsTrue` | A template using `ElapsedMs` (no `Context`, no rainbow) keeps re-rendering. |
-| `IsTimeDependent_WordElapsedWithoutVariable_ReturnsFalse` | The plain word "Elapsed" in a template doesn't count; only the exact name `ElapsedMs`. |
-| `CreateActivity_ElapsedMs_IsTheGivenValue` | `Activity.ElapsedMs` is the value passed in (83,456). |
-| `CreateActivity_ElapsedMs_IsAnIntLikeDurationMs` | `ElapsedMs` and `DurationMs` are both `int` (#16). |
-| `CreateActivity_NoElapsed_ElapsedMsIsNull` | No value → `null`. |
-| `CreateActivity_KeepsTrackMembers` | The wrapper still carries the track's own members (`Name`, `DurationMs`). |
+A template using `ProgressMs` keeps re-rendering; the plain word "Progress" doesn't count.
 
 ### `SpotifyHonorific.Tests/TitleRenderingServiceTests.cs`
 
-New class `TitleRenderingServiceActivityElapsedMsTests`. It renders real templates through `TitleRenderingService.RenderTitle`, the path the plugin uses in game. Its `ContextAt(seconds)` helper sets `TrackStartedAt` that many seconds ago, plus 0.2 s of slack so a slow run can't tip into the next second.
+Added to the existing `TitleRenderingServiceOverflowTests` class, reusing its service and `MakeTrack` helper:
 
-| Test | What it checks |
+```csharp
+// 0.2 s of slack so a slow test run can't tip into the next second.
+private static UpdaterContext ContextAt(double seconds) => new() { TrackStartedAt = DateTimeOffset.UtcNow - TimeSpan.FromSeconds(seconds + 0.2) };
+
+[Theory]
+[InlineData("{{ Activity.ProgressMs // 1000 }}", "83")]
+[InlineData("{{ Activity.ProgressMs // 60000 }}:{{ Activity.ProgressMs // 1000 % 60 | math.format \"00\" }}", "1:23")]
+[InlineData("{{ Activity.Artists[0].Name }} - {{ Activity.Name }}", "Artist - Song")]
+public void RenderTitle_ProgressMs_IsTimeSinceTrackStartedAndKeepsTrackVariables(string template, string expected)
+```
+
+Renders through the real `RenderTitle` with a song started 83 s ago:
+
+| Case | What it checks |
 |---|---|
-| `RenderTitle_ActivityElapsedMs_RendersMilliseconds` | `{{ Activity.ElapsedMs // 1000 }}` at 83 s → `83`. |
-| `RenderTitle_ReadmeSongPositionExample_Renders` | The README example at 1:05 → `Never Gonna Give You Up 1:05`. |
-| `RenderTitle_RemainingTimeFromDurationMs_Renders` | `(DurationMs - ElapsedMs) // 1000` at 13 s → `199`. |
-| `RenderTitle_ExistingActivityVariables_StillRender` (4 cases) | `Name`, `Artists[0].Name`, `Album.Name`, `DurationMs` unchanged through the wrapper. |
-| `RenderTitle_ContextSecsElapsed_Unchanged` | `Context.SecsElapsed` still renders its own value. |
+| `ProgressMs // 1000` → `83` | `ProgressMs` is the time since the song started. |
+| `m:ss` → `1:23` | Minutes and seconds built from milliseconds (`//` is Scriban's whole-number division). |
+| `Artists[0].Name - Name` → `Artist - Song` | The track's existing variables still work through the wrapper. |
+
+### `SpotifyHonorific.Tests/UpdaterTests.cs`
+
+No net change: the earlier start-time helper and its tests were removed along with the helper.
 
 ---
 
 ## Not changed
 
 - `Context.SecsElapsed`: how it counts, when it resets, and its README row.
-- Polling: no extra Spotify requests (`ProgressMs` was already in every poll).
+- Polling: no extra Spotify requests.
 - Everything else in the plugin.
 
-## Further simplifications considered (not applied)
+## Trade-offs of the minimal version
 
-| Option | Saves | Why kept |
-|---|---|---|
-| Inline `ComputeTrackStartedAt` into `ProcessPollResult` | 3 code lines, 4 tests | Upstream's pattern is small `internal static` helpers with unit tests; inlining leaves the start-time maths untested. |
-| Drop the README "Song position" example | 7 README lines | The original had no README docs, but upstream documents variables with examples; the example also shows how to use milliseconds. |
-| Shorten the `UpdaterContext` comment to one line | 2 lines | It explains why the property is `internal`, which isn't obvious. |
+- **No dedicated helper or its unit tests:** the start-time calculation is a single inline line in `Updater.ProcessPollResult` (a private method). It's covered indirectly by the render tests and the manual test.
+- **Full names instead of `using` lines:** `Scriban.Runtime.ScriptObject`, `Scriban.Runtime.ScriptObjectExtensions.Import` and `System.DateTimeOffset` are written out, which makes three lines longer but adds no lines.
+- **Wrapper built in two places:** the real render and the preview each build `Activity` in two lines, instead of sharing a helper method (which would add more lines than it saves).
+- **No README example:** the original had no README docs; the variable row is enough.
