@@ -69,7 +69,19 @@ Steps (for each, compare the title's `m:ss` with Spotify's position; the `T` num
 
 Result 2026-11-12: pass. Minutes and seconds follow Spotify's position; `Context.SecsElapsed` (`T`) counts as before. Template parity with the original `Activity.Elapsed` (incl. `TotalSeconds`) is covered by unit tests (`CreateActivity_Elapsed_RendersLikeTheOriginalActivity`).
 
-## `Activity.ElapsedMs` (#16)
+## `Activity.ProgressMs` (#25)
+
+Same checks as #16 below, with the renamed variable. Claude has rebuilt the dev plugin.
+
+1. "Available Template Variables": `Activity.ProgressMs` (System.Int32) is listed after `Activity.DurationMs`; `Activity.ElapsedMs` is gone.
+2. Test template:
+   ```
+   {{ Activity.ProgressMs // 60000 }}:{{ Activity.ProgressMs // 1000 % 60 | math.format "00" }} T{{ Context.SecsElapsed | math.floor }}
+   ```
+   Live Preview shows `0:00 T0`.
+3. Play, pause/resume, seek, skip: `m:ss` follows Spotify's position (allow ~15 s after play/resume with rate limit protection on).
+
+## `Activity.ElapsedMs` (#16) — superseded by #25
 
 Checks that `Activity.ElapsedMs` (milliseconds, like `Activity.DurationMs`) follows Spotify's position. Have the Spotify app open. Claude has rebuilt the dev plugin.
 

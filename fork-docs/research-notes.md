@@ -54,7 +54,15 @@ Mirror Discord.Net: store when the song started, and compute `Elapsed` at render
   {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format "00" }}
   ```
 
-### Decision: `Activity.ElapsedMs` instead of `Activity.Elapsed` (#16, 2026-11-12)
+### Decision: `Activity.ProgressMs`, minimal change (#25, 2026-11-12) — current
+
+- **Name:** `Activity.ProgressMs` (Int, ms), replacing `Activity.ElapsedMs`. Matches `Activity.DurationMs` and is Spotify's own name for the value (`progress_ms`).
+- **Why `Activity` needs a wrapper:** `Activity` is the Spotify library's `FullTrack` (track metadata). Playback position lives on Spotify's separate "currently playing" response (`ProgressMs`, `IsPlaying`, `Item`); the plugin passes only `Item` to templates, so the position was never reachable. Nothing is hidden or removed. `FullTrack` can't take new members, so the render wraps it in a Scriban `ScriptObject` with `ProgressMs` added. (`Context.*` needs no wrapper because `UpdaterContext` is the plugin's own class.)
+- **Minimised:** 11 added / 4 replaced plugin lines; helpers inlined, full type names instead of new `using` lines, README example dropped. Same behaviour. Line-by-line explanation: `fork-docs/code-changes.md`.
+
+The sections below record earlier versions (#6 `Activity.Elapsed`, #16 `Activity.ElapsedMs`) for history.
+
+### Decision: `Activity.ElapsedMs` instead of `Activity.Elapsed` (#16, 2026-11-12) — superseded by #25
 
 - **Decision:** expose the playback position as a single `Activity.ElapsedMs` (Int, milliseconds), replacing the TimeSpan `Activity.Elapsed` from #6 before anything goes upstream.
 - **Why:** SpotifyHonorific's `Activity` is a Spotify track with a small set of simple variables (`Activity.DurationMs` is an Int in milliseconds; there's no `System.TimeSpan` anywhere). `ElapsedMs` matches `DurationMs`, so position and duration work the same way (remaining = `Activity.DurationMs - Activity.ElapsedMs`). The original's TimeSpan members aren't reproduced.
