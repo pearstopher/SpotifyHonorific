@@ -46,3 +46,26 @@ Afterwards, switch Active Config back to your usual one (you can delete the test
 
 Result 2026-11-12: `Context.SecsElapsed` is the number of seconds the current template context has been active. A new context starts when a song starts or resumes, so it reads 0 there, wherever playback is in the song. That suits time-based effects like cycling text; it isn't meant to show the song's position, which is what the re-added variable is for. Log matches: pausing clears the title (`ClearCharacterTitle IPC` at 10:32:57), and a new context starts on resume.
 
+## Re-added `Activity.Elapsed` (#6)
+
+Checks that `Activity.Elapsed` shows how far into the song playback is, matching Spotify. Have the Spotify app open so you can see its position. Claude has rebuilt the dev plugin.
+
+Setup:
+1. `/spotifyhonorific config` → open "Available Template Variables": `Activity.Elapsed` (System.TimeSpan) is listed.
+2. Active Config: click **New**, make it active, and set its Title Template to:
+   ```
+   {{ Activity.Elapsed.Minutes }}:{{ Activity.Elapsed.Seconds | math.format "00" }} T{{ Context.SecsElapsed | math.floor }}
+   ```
+   The Live Preview shows `0:00 T0` (no error).
+
+Steps (for each, compare the title's `m:ss` with Spotify's position; the `T` number is `Context.SecsElapsed`, for comparison):
+1. **Start** a song from the beginning. Wait ~30 s. `m:ss` matches Spotify (within ~1–2 s).
+2. **Pause** ~10 s, then **resume**. The title comes back at Spotify's position (not 0:00); `T` restarts at 0.
+3. **Seek** forward to around 2:00. Within a few seconds `m:ss` jumps to ~2:00 and keeps counting.
+4. **Seek** back to around 0:30. `m:ss` follows.
+5. **Skip** to the next song. `m:ss` starts again from ~0:00.
+6. **Start a song partway**: pause, seek to about 1:00, resume. The title appears at ~1:00.
+7. Switch to your usual template: it still works as before.
+
+Result 2026-11-12: pass. Minutes and seconds follow Spotify's position; `Context.SecsElapsed` (`T`) counts as before. Template parity with the original `Activity.Elapsed` (incl. `TotalSeconds`) is covered by unit tests (`CreateActivity_Elapsed_RendersLikeTheOriginalActivity`).
+
