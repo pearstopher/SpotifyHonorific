@@ -1,0 +1,100 @@
+# Fork-only: publishes test builds of this fork with its own Dalamud repo.json.
+# Upstream's release.yml and scheduled-bump.yml are disabled on the fork.
+# Tags are upstream's version plus a 4th fork build number, e.g. v1.18.2.1.
+# Dalamud custom repo URL:
+#   https://github.com/<owner>/SpotifyHonorific/releases/latest/download/repo.json
+name: Fork Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (4 parts, e.g. 1.18.2.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.version.outputs.tag_name }}
+    steps:
+      - name: Determine Version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Fork versions need 4 parts (e.g. 1.18.2.1), got '$VERSION'"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
+
+  build:
+    needs: prepare
+    uses: ./.github/workflows/setup-and-build.yml
+    with:
+      configuration: Release
+      version: ${{ needs.prepare.outputs.version }}
+
+  release:
+    needs: [ prepare, build ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download Release Asset
+        uses: actions/download-artifact@v8
+        with:
+          name: SpotifyHonorific-release
+          path: release
+
+      - name: Generate repo.json
+        env:
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.tag_name }}
+        run: |
+          ZIP_URL="https://github.com/$REPO/releases/download/$TAG/SpotifyHonorific.zip"
+          unzip -p release/SpotifyHonorific.zip SpotifyHonorific.json \
+            | sed '1s/^\xEF\xBB\xBF//' \
+            | jq --arg url "$ZIP_URL" --arg repo "https://github.com/$REPO" --argjson now "$(date +%s)" \
+              '[. + {
+                RepoUrl: $repo,
+                DownloadLinkInstall: $url,
+                DownloadLinkTesting: $url,
+                DownloadLinkUpdate: $url,
+                IsHide: false,
+                IsTestingExclusive: false,
+                LastUpdate: $now,
+                Changelog: "Fork test build"
+              }]' > release/repo.json
+          cat release/repo.json
+          jq -e '.[0] | .InternalName and .AssemblyVersion and .DalamudApiLevel' release/repo.json > /dev/null \
+            || { echo "::error::repo.json is missing InternalName, AssemblyVersion or DalamudApiLevel"; exit 1; }
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ needs.prepare.outputs.tag_name }}
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          target_commitish: ${{ github.sha }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          body: Fork test build of ${{ github.sha }}.
+          files: |
+            release/SpotifyHonorific.zip
+            release/repo.json
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
