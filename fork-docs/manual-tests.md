@@ -1,6 +1,6 @@
 # Manual tests (fork)
 
-Fork-only. Checks the unit tests can't do.
+Fork-only. Checks the unit tests can't do. All tests use the **local dev plugin** (auto-reload on). Claude runs all builds before a test; the steps below are only the in-game parts.
 
 ## Install from the fork's repo URL (#1)
 
@@ -12,10 +12,37 @@ Fork-only. Checks the unit tests can't do.
 
 ## Load a local dev build (#3)
 
-1. Run `dotnet build` in the project folder. It ends with "Build succeeded".
-2. In game, add the dev plugin path from DEVELOPMENT.md under `/xlsettings` → Experimental → Dev Plugin Locations, and save.
-3. `/xlplugins` → Installed: disable the SpotifyHonorific installed from your repo URL.
-4. `/xlplugins` → Dev Tools → Installed Dev Plugins: enable SpotifyHonorific and turn on auto-reload. It shows version `1.18.1.0`.
-5. Play a song. Your title updates as before.
-6. Run `dotnet build` again. Within a few seconds the dev plugin reloads (a reload line appears in `/xllog`), and the title still updates.
-7. Disable the dev plugin and re-enable the installed one, so you're back on the repo build.
+Claude has already built the plugin.
+
+1. In game, add the dev plugin path from DEVELOPMENT.md under `/xlsettings` → Experimental → Dev Plugin Locations, and save.
+2. `/xlplugins` → Installed: disable (or uninstall) any other SpotifyHonorific.
+3. `/xlplugins` → Dev Tools → Installed Dev Plugins: enable SpotifyHonorific and turn on auto-reload. It shows version `1.18.1.0`.
+4. Play a song. Your title updates as before.
+5. Ask Claude to rebuild. Within a few seconds the dev plugin reloads (a reload line appears in `/xllog`), and the title still updates.
+
+Result 2026-11-12: pass (dev plugin reloaded at 10:31:28, title kept updating).
+
+## Baseline: current timer `Context.SecsElapsed` (#4)
+
+Records how the existing timer behaves, to compare with Spotify's own clock. Have the Spotify app open so you can see its position.
+
+Setup:
+1. `/spotifyhonorific config` → Active Config: click **New**. Make the new config active.
+2. Set its Title Template (scriban) to:
+   ```
+   T {{ Context.SecsElapsed | math.floor }}
+   ```
+   The title shows `T` and the timer in whole seconds.
+
+Steps (for each, write what the title shows next to Spotify's position):
+1. **Start** a song from the beginning. Wait ~30 s.
+2. **Pause** for ~10 s.
+3. **Resume** and wait ~10 s.
+4. **Seek** forward to around 2:00 in the same song. Wait ~5 s.
+5. **Skip** to the next song.
+6. **Start a song partway**: pause, seek to about 1:00, then resume.
+
+Afterwards, switch Active Config back to your usual one (you can delete the test config).
+
+Result 2026-11-12 (baseline, current behaviour): `Context.SecsElapsed` restarts at 0 whenever the song starts or resumes, no matter how far into the song playback is. It never reflects Spotify's position. Log matches: pausing clears the title (`ClearCharacterTitle IPC` at 10:32:57), which resets the timer.
+

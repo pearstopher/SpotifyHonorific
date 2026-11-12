@@ -23,17 +23,19 @@ Sync the fork with upstream: `gh repo sync pearstopher/SpotifyHonorific`, then `
 
 ## Edit-and-test loop
 
-1. Edit code, then run `dotnet build` and `dotnet test`.
+1. Edit code, then run `dotnet build` and `dotnet test` (Claude does this; the in-game checks are mine).
 2. In game: `/xlplugins` → Dev Tools → Installed Dev Plugins → SpotifyHonorific. Turn on **auto-reload** once; after that, every build reloads the plugin automatically. (Otherwise disable and re-enable it.)
-3. Only one SpotifyHonorific can be loaded at a time. **Disable** the installed one (from my repo URL) before enabling the dev build, and switch back after.
-4. Check the version in the plugin list: the dev build shows the csproj `<Version>` (currently `1.18.1.0`; upstream only sets the real version at release time), while repo builds show `1.18.2.x`.
+3. Only one SpotifyHonorific can be loaded at a time. Keep any installed copy disabled or uninstalled; all testing uses the dev build.
+4. To confirm a new build is running, check `dalamud.log` for the dev plugin's reload lines (`Unloading` / `Finished loading SpotifyHonorific`) after the build time. The dev build's version is the csproj `<Version>` (currently `1.18.1.0`), which doesn't change per build.
 
 ## Logs
 
 - `%APPDATA%\XIVLauncher\dalamud.log` (previous session: `dalamud.old.log`). In game, `/xllog` shows the same log live.
 - Plugin lines are tagged `[SpotifyHonorific]`; debug lines (e.g. `POLLING NOW`) need the log level set to Debug in `/xllog`.
 
-## Test builds from this fork
+## Test builds from this fork (optional, not used for testing)
+
+Testing uses the dev plugin above. This release path exists if I ever want an installable build.
 
 `.github/workflows/fork-release.yml` builds the plugin and publishes a GitHub release with `SpotifyHonorific.zip` and a generated `repo.json`.
 
